@@ -966,6 +966,25 @@
       </div>
     </div>
   </div>
+  <div class="feature-box compact collapsed fxbox" data-layer="vignette">
+    <div class="box-title"><span><i class="grip" title="drag up or down: an effect works on everything above it in this list, and leaves what is below it alone"></i>VIGNETTE <b class="tag">EFFECT</b> <b id="vVig" class="tag"></b></span></div>
+    <div class="fxrow">
+      <span class="sub-lbl">SIZE <b id="vVigSize">100%</b></span>
+      <input type="range" id="cVignette" min="0" max="100" value="100" title="how much of the picture stays clear: 100% = no vignette, 0% = the edges close in to nothing"/>
+      <div class="mod-group">
+        <span class="sub-lbl">MOD DEPTH <b class="b-depth" id="vModVignette">0%</b></span>
+        <input type="range" class="mod-slider" id="cModVignette" min="-100" max="100" value="0"/>
+        <span class="sub-lbl">LFO RATE <b class="b-rate" id="vLfoRateVignette">0.25 Hz</b></span>
+        <input type="range" class="lfo-rate-slider" id="cLfoRateVignette" min="1" max="100" value="35"/>
+        <span class="sub-lbl">AUDIO MOD (BASS) <b class="b-aud" id="vAudModVignette">0%</b></span>
+        <input type="range" class="aud-mod-slider" id="cAudModVignette" min="-100" max="100" value="0"/>
+      </div>
+      <span class="sub-lbl">FALLOFF <b id="vVigFall">50%</b></span>
+      <input type="range" id="cVigFall" min="0" max="100" value="50" title="how far the fade reaches in from the vignette's edge: 0% = a hard cut, 100% = a very deep, smooth fade (half the frame's diagonal)"/>
+      <button id="bVigMask" class="toggle-full" style="margin-top:4px;" title="MASK ON: the vignetted edges reveal the layer below this effect in the list (the layer directly above it in the panel is the one being masked). MASK OFF: the edges are black">MASK OFF</button>
+      <div class="seg" id="vigShapes" style="grid-template-columns:repeat(2,1fr); margin-top:4px;"><button data-shape="circular" class="on">CIRCULAR</button><button data-shape="window">WINDOW</button></div>
+    </div>
+  </div>
   <div class="feature-box collapsed">
     <div class="box-title">DISPLAY FILTER</div>
     <div class="seg" id="filters"></div>
@@ -1207,11 +1226,12 @@ const state = {
   ascii:0, modAscii:0.0, lfoRateAscii:0.25, audModAscii:0.0,
   fog:0, modFog:0.0, lfoRateFog:0.25, audModFog:0.0,
   feedback:0, fbZoom:0.12, fbRot:5.7, fbHue:0, fbKey:'off', fbKeyLevel:0.5, fbKeyGain:0.5, modFeedback:0.0, lfoRateFeedback:0.25, audModFeedback:0.0,
+  vignette:1, modVignette:0.0, lfoRateVignette:0.25, audModVignette:0.0, vigFall:0.5, vigMask:false, vigShape:'circular',   // VIGNETTE: size (1 = off), falloff, mask (edges reveal the layer below) and shape ('circular' | 'window')
   invert:false, bgMode:'palette', noBgA:true, noBgB:true, palAudio:false,
   muteCam:false, muteVA:false, muteVB:false, muteImg:false, muteA:false, muteB:false, muteC:false, muteText:false,
   layerOrder:['cam', 'vA', 'vB', 'img', 'A', 'B', 'C', 'text'],
   outShape:'window',   // FRAME SHAPE: 'window', '16:9', '1:1' or '9:16'
-  stack:['cam', 'vA', 'vB', 'img', 'A', 'B', 'C', 'text', 'fid', 'comic', 'split', 'ascii', 'fog', 'trails', 'glitch', 'paint', 'points', 'thresh', 'edges', 'contour', 'psort', 'dither', 'halftone', 'blur', 'feedback'],   // the layers and the effects in one list: an effect works on what is beneath it   // bottom of the stack first; the panel shows the same order top to bottom
+  stack:['cam', 'vA', 'vB', 'img', 'A', 'B', 'C', 'text', 'fid', 'comic', 'split', 'ascii', 'fog', 'trails', 'glitch', 'paint', 'points', 'thresh', 'edges', 'contour', 'psort', 'dither', 'halftone', 'blur', 'feedback', 'vignette'],   // the layers and the effects in one list: an effect works on what is beneath it   // bottom of the stack first; the panel shows the same order top to bottom
   imgKey:'off', imgKeyLevel:0.5, imgKeyGain:0.5, imgKeyInv:false, 
   imgExp:0, imgTemp:0, imgSat:1, imgSh:0, imgMid:0, imgHi:0, imgTintHue:0, imgTintAmt:0,
   camGranular:false, camGrainMax:2.0, camGrainFade:0.15,
@@ -1236,14 +1256,14 @@ SRC_MODS.forEach(([K, key, band, def]) => { state[key] = def; state['mod' + K] =
 
 const lfoPhases = { 
   fid: 0, fxLvl: 0, trails: 0, blur: 0, glitch: 0, points: 0, paint: 0, comic: 0, split: 0, feedback: 0,
-  thresh: 0, edges: 0, contour: 0, psort: 0, dither: 0, halftone: 0, ascii: 0, fog: 0,
+  thresh: 0, edges: 0, contour: 0, psort: 0, dither: 0, halftone: 0, ascii: 0, fog: 0, vignette: 0,
   textScale: 0, textScatter: 0, textRotate: 0, textPulse: 0, textScan: 0
 };
 // eff.rate / eff.density are what the shapes read: they are set to the current slot's values just before each slot draws
 // (as is eff.zoom, which safeDraw reads).
 const eff = { 
   rate: 0.45, density: 0.5, zoom: 1, fidelity: 1.0, fxLevel: 0.7, trails: 0, blur: 0, glitch: 0, points: 0, paint: 0, comic: 0, split: 0, feedback: 0,
-  thresh: 0, edges: 0, contour: 0, psort: 0, dither: 0, halftone: 0, ascii: 0, fog: 0,
+  thresh: 0, edges: 0, contour: 0, psort: 0, dither: 0, halftone: 0, ascii: 0, fog: 0, vignette: 1,
   textScale: 46, textScatter: 0.15, textRotate: 0.0, textPulse: 0.30, textScan: 0.45
 };
 SRC_MODS.forEach(([K, key, band, def]) => { lfoPhases[K] = 0; eff[key] = def; });
@@ -5282,7 +5302,7 @@ const RS = { c:null, x:null };   // RGB channel scratch
 const BLR = { c:null, x:null };  // BLUR's shrunk working copy
 // THE STACK: the eight layers and the seventeen effects in one list, bottom first. An effect works on everything
 // beneath it, so a layer that comes after it in the list is laid over the treated picture untouched.
-const FX_KEYS = ['fid', 'comic', 'split', 'ascii', 'fog', 'trails', 'glitch', 'paint', 'points', 'thresh', 'edges', 'contour', 'psort', 'dither', 'halftone', 'blur', 'feedback'];
+const FX_KEYS = ['fid', 'comic', 'split', 'ascii', 'fog', 'trails', 'glitch', 'paint', 'points', 'thresh', 'edges', 'contour', 'psort', 'dither', 'halftone', 'blur', 'feedback', 'vignette'];
 const FX_SET = new Set(FX_KEYS);
 const FX_STY = { thresh:0, edges:1, contour:2, psort:3, dither:4, halftone:5 };   // these six share one pass when they sit together in this order
 // RESOLUTION and INK belong to the shape buffer. Straight after the bottom run of layers they are done there, as they
@@ -5327,7 +5347,7 @@ const LIVE_STACK = [];
 // is this entry of the stack an effect that is switched off this frame? (layers always pass)
 function fxLive(k){
   if(!FX_SET.has(k)) return true;
-  return k === 'fid' ? eff.fidelity < 0.999 : k === 'comic' ? eff.comic > 0.01 : k === 'split' ? eff.split > 0.005 : k === 'blur' ? (eff.blur > 0.01 && FILTER_OK) : eff[k] > 0.01;
+  return k === 'fid' ? eff.fidelity < 0.999 : k === 'vignette' ? eff.vignette < 0.995 : k === 'comic' ? eff.comic > 0.01 : k === 'split' ? eff.split > 0.005 : k === 'blur' ? (eff.blur > 0.01 && FILTER_OK) : eff[k] > 0.01;
 }
 // is this layer putting anything into the picture this frame?
 function layerLive(L){
@@ -5927,6 +5947,68 @@ function fogPass(ctx, W, H, tw, a){
   ctx.globalCompositeOperation = 'screen';                            // (screen, not add: a light picture must not burn out to white)
   ctx.globalAlpha = a*(0.34 + FG.puff*0.16);
   ctx.drawImage(FG.b, 0, 0, DW, DH, 0, 0, W, H);
+  ctx.restore();
+}
+
+// VIGNETTE: shades the edges of the picture. SIZE is how much of the frame stays clear (100% = no vignette), FALLOFF the
+// softness of the edge. With MASK off the shade is black. With MASK on the shade is cut from a photograph of the picture
+// taken just before the layer beneath the vignette was drawn (vgSnap, called from the stack loop), so the edges show
+// what lies under that layer; with nothing photographed they show the background colour. CIRCULAR is a radial gradient,
+// WINDOW a rounded-off rectangle made of a horizontal and a vertical band.
+const VGN = { under:null, ux:null, have:false, m:null, mx:null };
+function vgSnap(){
+  if(!VGN.under){ VGN.under = document.createElement('canvas'); VGN.ux = VGN.under.getContext('2d'); }
+  if(VGN.under.width !== W || VGN.under.height !== H){ VGN.under.width = W; VGN.under.height = H; }
+  const c = VGN.ux;
+  c.setTransform(1, 0, 0, 1, 0, 0); c.globalAlpha = 1; c.globalCompositeOperation = 'copy'; c.filter = 'none';
+  c.drawImage(view, 0, 0);
+  VGN.have = true;
+}
+// The fade: FALLOFF is a distance, measured inward from the vignette's edge, over which the shade goes from clear to
+// full. 0% is a hard edge; 100% is a fade as deep as half the frame's diagonal. The curve is a smootherstep
+// (6t^5 - 15t^4 + 10t^3: zero slope and zero curvature at both ends) laid down as 24 colour stops, so the eye finds
+// no seam where the fade begins or ends.
+const VG_STEPS = 24;
+function vgFadeStops(g, u0, u1, rev){                           // stops from u0 (clear) to u1 (black); rev swaps the two ends
+  for(let i = 0; i <= VG_STEPS; i++){
+    const t = i/VG_STEPS, s = t*t*t*(t*(t*6 - 15) + 10), a = rev ? 1 - s : s;
+    g.addColorStop(u0 + (u1 - u0)*t, 'rgba(0,0,0,' + a.toFixed(4) + ')');
+  }
+}
+// paints the shade (opaque black where the vignette is full, clear in the middle) with the current size / falloff / shape
+function vgShade(c){
+  const size = clamp(eff.vignette, 0, 1), fall = clamp(state.vigFall, 0, 1), cx = W*0.5, cy = H*0.5;
+  const fadePx = Math.max(0.5, fall*0.5*Math.hypot(W, H));        // the depth of the fade, in pixels, from the vignette's edge inward
+  c.globalCompositeOperation = 'source-over'; c.globalAlpha = 1; c.filter = 'none';
+  if(state.vigShape === 'window'){
+    const hw = Math.max(0.5, W*0.5*size), hh = Math.max(0.5, H*0.5*size);
+    const band = (len) => Math.min(1, fadePx/len);                  // the fade as a fraction of the window's full width / height
+    const fx = band(hw*2), gx = c.createLinearGradient(cx - hw, 0, cx + hw, 0);
+    vgFadeStops(gx, 0, fx*0.5, true); vgFadeStops(gx, 1 - fx*0.5, 1, false);   // black -> clear at the left, clear -> black at the right
+    c.fillStyle = gx; c.fillRect(0, 0, W, H);
+    const fy = band(hh*2), gy = c.createLinearGradient(0, cy - hh, 0, cy + hh);
+    vgFadeStops(gy, 0, fy*0.5, true); vgFadeStops(gy, 1 - fy*0.5, 1, false);
+    c.fillStyle = gy; c.fillRect(0, 0, W, H);
+    return;
+  }
+  const r = size*0.5*Math.hypot(W, H), r0 = Math.max(0, r - fadePx), r1 = Math.max(r0 + 0.5, r);
+  const g = c.createRadialGradient(cx, cy, r0, cx, cy, r1);
+  vgFadeStops(g, 0, 1, false);
+  c.fillStyle = g; c.fillRect(0, 0, W, H);
+}
+function vignettePass(ctx, W, H, bgCol){
+  ctx.save(); ctx.setTransform(1, 0, 0, 1, 0, 0); ctx.globalAlpha = 1; ctx.filter = 'none'; ctx.imageSmoothingEnabled = true;
+  if(!state.vigMask){ vgShade(ctx); ctx.restore(); return; }     // MASK off: black edges
+  if(!VGN.m){ VGN.m = document.createElement('canvas'); VGN.mx = VGN.m.getContext('2d'); }
+  if(VGN.m.width !== W || VGN.m.height !== H){ VGN.m.width = W; VGN.m.height = H; }
+  const m = VGN.mx;
+  m.setTransform(1, 0, 0, 1, 0, 0); m.globalAlpha = 1; m.filter = 'none'; m.globalCompositeOperation = 'source-over'; m.clearRect(0, 0, W, H);
+  vgShade(m);                                                     // the shade is the stencil...
+  m.globalCompositeOperation = 'source-in';                       // ...and the picture underneath is cut to it
+  if(VGN.have && VGN.under.width === W && VGN.under.height === H) m.drawImage(VGN.under, 0, 0);
+  else { m.fillStyle = bgCol; m.fillRect(0, 0, W, H); }
+  m.globalCompositeOperation = 'source-over';
+  ctx.globalCompositeOperation = 'source-over'; ctx.drawImage(VGN.m, 0, 0);
   ctx.restore();
 }
 
@@ -19031,6 +19113,7 @@ function frame(now){
   lfoPhases.comic       += dt * TAU * state.lfoRateComic;
   lfoPhases.split       += dt * TAU * state.lfoRateSplit;
   lfoPhases.feedback    += dt * TAU * state.lfoRateFeedback;
+  lfoPhases.vignette    += dt * TAU * state.lfoRateVignette;
   lfoPhases.textScale   += dt * TAU * state.lfoRateTextScale;
   lfoPhases.textScatter += dt * TAU * state.lfoRateTextScatter;
   lfoPhases.textRotate  += dt * TAU * state.lfoRateTextRotate;
@@ -19055,6 +19138,7 @@ function frame(now){
   eff.comic   = clamp(state.comic   + Math.sin(lfoPhases.comic)  * state.modComic  + A[2] * state.audModComic,  0, 1);
   eff.split   = clamp(state.split   + Math.sin(lfoPhases.split)  * state.modSplit  + A[0] * state.audModSplit,  0, 1);
   eff.feedback= clamp(state.feedback+ Math.sin(lfoPhases.feedback)* state.modFeedback + A[0] * state.audModFeedback, 0, 2);
+  eff.vignette= clamp(state.vignette+ Math.sin(lfoPhases.vignette)* state.modVignette + A[0] * state.audModVignette, 0, 1);
   eff.thresh    = clamp(state.thresh + Math.sin(lfoPhases.thresh)*state.modThresh + A[0]*state.audModThresh, 0, 1);
   eff.edges     = clamp(state.edges + Math.sin(lfoPhases.edges)*state.modEdges + A[2]*state.audModEdges, 0, 1);
   eff.contour   = clamp(state.contour + Math.sin(lfoPhases.contour)*state.modContour + A[1]*state.audModContour, 0, 1);
@@ -19119,7 +19203,14 @@ function frame(now){
   const stack = LIVE_STACK; stack.length = 0; for(const k of state.stack) if(fxLive(k)) stack.push(k);
   const nS = stack.length;
   let i0 = 0; while(i0 < nS && !FX_SET.has(stack[i0])) i0++;
-  const textInMix = !(i0 > 0 && stack[i0 - 1] === 'text');       // the text is laid on the view at full size when it is the top of this run
+  // VIGNETTE with MASK on: the layer just beneath it is drawn on its own run, after the picture under that layer has
+  // been photographed (vgSnap), so the vignetted edges can show that picture instead of black. When the vignette is the
+  // first effect, the bottom run stops short of that layer and the main loop draws it.
+  VGN.have = false;
+  const vgIdx = state.vigMask ? stack.indexOf('vignette') : -1;
+  let iDraw = i0;
+  if(vgIdx === i0 && i0 >= 2){ let j = i0 - 1; while(j >= 1 && !layerLive(stack[j])) j--; if(j >= 1) iDraw = j; }
+  const textInMix = !(iDraw > 0 && stack[iDraw - 1] === 'text');  // the text is laid on the view at full size when it is the top of this run
   let nPre = 0, preRes = false, preInk = false, inkFirst = false; // RESOLUTION / INK straight after that run: done on the buffer
   for(; nPre < 2 && i0 + nPre < nS; nPre++){
     const k2 = stack[i0 + nPre];
@@ -19135,7 +19226,7 @@ function frame(now){
     else if(L === 'text'){ if(textIn && state.text && !state.muteText){ bctx.globalCompositeOperation = 'lighter'; drawVectorText(t, bctx); } }
     else drawShapeSlot(L, L === 'A' ? t : L === 'B' ? tB : tC);
   });
-  for(let i = 0; i < i0; i++) drawLayer(stack[i], textInMix);
+  for(let i = 0; i < iDraw; i++) drawLayer(stack[i], textInMix);
   bgStrip = false;
   eff.density = eff.denA; eff.rate = eff.rateA; eff.zoom = 1;
 
@@ -19397,6 +19488,7 @@ function frame(now){
       case 'points': if(eff.points > 0.01) pointsPass(ctx, W, H, tw, eff.points); break;
       case 'blur': fxBlur(); break;
       case 'feedback': fxFeedback(); break;
+      case 'vignette': vignettePass(ctx, W, H, bgCol); break;
       default: stylizePass(ST_VIEW, ctx, view, W, H, tw, group || [key]);
     }
   };
@@ -19422,7 +19514,7 @@ function frame(now){
     ctx.save(); ctx.setTransform(1, 0, 0, 1, 0, 0); ctx.globalCompositeOperation = 'lighter'; ctx.globalAlpha = 1; ctx.filter = 'none'; ctx.imageSmoothingEnabled = false;
     ctx.drawImage(txtBuf, 0, 0); ctx.restore();
   };
-  for(let i = i0 + nPre; i < nS; i++){
+  for(let i = iDraw + nPre; i < nS; i++){
     const key = stack[i];
     if(FX_SET.has(key)){
       flushLayers();
@@ -19432,10 +19524,13 @@ function frame(now){
       continue;
     }
     if(!layerLive(key)) continue;
-    if(key === 'text'){ flushLayers(); textOnView(); continue; }
+    // is this the layer a masking VIGNETTE sits on? (nothing live between the two) -> photograph the view before it goes on
+    let maskNext = vgIdx > i; if(maskNext) for(let j = i + 1; j < vgIdx; j++) if(FX_SET.has(stack[j]) || layerLive(stack[j])){ maskNext = false; break; }
+    if(key === 'text'){ flushLayers(); if(maskNext) vgSnap(); textOnView(); continue; }
     const op = (key === 'A' || key === 'B' || key === 'C') ? pal.blend : 'source-over';
-    if(runOp !== op){
+    if(runOp !== op || maskNext){
       flushLayers();
+      if(maskNext) vgSnap();
       bctx.globalCompositeOperation = 'source-over'; bctx.globalAlpha = 1; bctx.clearRect(0, 0, bw, bh);
       runOp = op;
     }
@@ -19633,6 +19728,9 @@ function syncFx(){
   update('vCo', Math.round(state.comic * 100) + '%');
   update('vSp', Math.round(state.split * 100) + '%');
   update('vFb', Math.round(state.feedback * 100) + '%');
+  update('vVig', Math.round(state.vignette * 100) + '%');
+  update('vVigSize', Math.round(state.vignette * 100) + '%');
+  update('vVigFall', Math.round(state.vigFall * 100) + '%');
 }
 
 // Per-shape "draw only the main shape" toggles.
@@ -19653,6 +19751,20 @@ function syncMutes(){ MUTE_KEYS.forEach(k => setMute(k, state['mute' + k])); }
 function setInvert(on){
   state.invert = on;
   syncButton('bInvert', on ? 'INVERT ON' : 'INVERT OFF', on);
+}
+
+// VIGNETTE: MASK (the edges show the layer below instead of black) and SHAPE ('circular' | 'window'), mirrored in both windows.
+function setVigMask(on){
+  state.vigMask = Boolean(on);
+  syncButton('bVigMask', state.vigMask ? 'MASK ON' : 'MASK OFF', state.vigMask);
+}
+function setVigShape(id){
+  if(id !== 'window') id = 'circular';
+  state.vigShape = id;
+  [document, popoutWin && !popoutWin.closed ? popoutWin.document : null].forEach(doc => {
+    if(!doc) return;
+    doc.querySelectorAll('#vigShapes button').forEach(b => b.classList.toggle('on', b.dataset.shape === id));
+  });
 }
 
 // Base background: palette colour, or an exact BLACK / WHITE / GREEN SCREEN that sits under the shapes.
@@ -20105,8 +20217,8 @@ function presetCapture(){
     sliders, text:state.text, seed:state.seed, recMax:REC.max, vcamRes:OUTRES.w + 'x' + OUTRES.h, outShape:state.outShape, layerOrder:state.layerOrder.slice(), stack:state.stack.slice(),
     seg:{ fontStyle:state.fontStyle, shapeA:state.shapeA, shapeB:state.shapeB, shapeC:state.shapeC, filter:state.filter, palette:state.palette, bgMode:state.bgMode, fbKey:state.fbKey, camKey:state.camKey, vAKey:state.vAKey, vBKey:state.vBKey, imgKey:state.imgKey,
          audBandA:state.audBandA, audBandB:state.audBandB, audBandC:state.audBandC,
-         blendCam:state.blendCam, blendVA:state.blendVA, blendVB:state.blendVB, blendImg:state.blendImg, blendA:state.blendA, blendB:state.blendB, blendC:state.blendC },
-    toggles:{ invert:state.invert, vALoop:state.vALoop, vBLoop:state.vBLoop, vAFill:state.vAFill, vBFill:state.vBFill, noBgA:state.noBgA, noBgB:state.noBgB, noBgC:state.noBgC,
+         blendCam:state.blendCam, blendVA:state.blendVA, blendVB:state.blendVB, blendImg:state.blendImg, blendA:state.blendA, blendB:state.blendB, blendC:state.blendC, vigShape:state.vigShape },
+    toggles:{ invert:state.invert, vigMask:state.vigMask, vALoop:state.vALoop, vBLoop:state.vBLoop, vAFill:state.vAFill, vBFill:state.vBFill, noBgA:state.noBgA, noBgB:state.noBgB, noBgC:state.noBgC,
               beatReseed:state.beatReseed, camGranular:state.camGranular, vAGranular:state.vAGranular, vBGranular:state.vBGranular, palAudio:state.palAudio,
               camKeyInv:state.camKeyInv, vAKeyInv:state.vAKeyInv, vBKeyInv:state.vBKeyInv, imgKeyInv:state.imgKeyInv,
               muteCam:state.muteCam, muteVA:state.muteVA, muteVB:state.muteVB, muteImg:state.muteImg, muteA:state.muteA, muteB:state.muteB, muteC:state.muteC, muteText:state.muteText }
@@ -20170,6 +20282,7 @@ function presetApply(p){
   DECK.B.setGranular(Boolean(tg.vBGranular));
   setPalAudio(Boolean(tg.palAudio));
   MUTE_KEYS.forEach(k => setMute(k, Boolean(tg['mute' + k])));
+  setVigMask(Boolean(tg.vigMask)); setVigShape(sg.vigShape || 'circular');
   setLayerOrder(p.stack, null, p.layerOrder);                                  // presets saved before layers could be reordered load the standard order
   if(Number.isInteger(p.seed)){ state.seed = p.seed; reseed(p.seed); }
   if(!REC.rec){                                                 // a recording in progress keeps its length, size and shape
@@ -20430,9 +20543,10 @@ let layerDragEnd = -1e9;
 function setLayerOrder(order, keep, old){
   // order: the whole stack (layers and effects). old: the layers alone, as presets from before the effects could be
   // moved have them - the effects then go on top in their standard order, which is how those presets were made.
-  const full = (o) => Array.isArray(o) && o.length === STACK_KEYS.length && STACK_KEYS.every(k => o.includes(k));
-  const lay = (o) => Array.isArray(o) && o.length === LAYER_KEYS.length && LAYER_KEYS.every(k => o.includes(k));
-  state.stack = full(order) ? order.slice() : lay(order) ? order.concat(FX_KEYS) : lay(old) ? old.concat(FX_KEYS) : STACK_KEYS.slice();
+  // A stack from before an effect existed (e.g. VIGNETTE) is kept as it is and the missing effects go on top.
+  const fix = (o) => (Array.isArray(o) && o.length && o.every(k => STACK_KEYS.includes(k)) && LAYER_KEYS.every(k => o.includes(k)) && new Set(o).size === o.length)
+    ? o.concat(STACK_KEYS.filter(k => !o.includes(k))) : null;
+  state.stack = fix(order) || fix(old) || STACK_KEYS.slice();
   state.layerOrder = state.stack.filter(k => !FX_SET.has(k));
   trailsArmed = false; fbArmed = false;                           // what these remember was made with the old order
   [document, popoutWin && !popoutWin.closed ? popoutWin.document : null].forEach(doc => {
@@ -20639,6 +20753,12 @@ function wireControls(targetDoc = document){
   });
   const bInvert = targetDoc.getElementById('bInvert');
   if(bInvert) bInvert.addEventListener('click', ()=>setInvert(!state.invert));
+  const bVigMask = targetDoc.getElementById('bVigMask');
+  if(bVigMask) bVigMask.addEventListener('click', ()=>setVigMask(!state.vigMask));
+  targetDoc.querySelectorAll('#vigShapes button').forEach(b => {
+    b.classList.toggle('on', b.dataset.shape === state.vigShape);
+    b.addEventListener('click', ()=>setVigShape(b.dataset.shape));
+  });
   MUTE_KEYS.forEach(k => {
     const b = targetDoc.getElementById('bMute' + k);
     if(b) b.addEventListener('click', ()=>setMute(k, !state['mute' + k]));
@@ -20731,8 +20851,11 @@ function wireControls(targetDoc = document){
   const cFbKeyLevel = targetDoc.getElementById('cFbKeyLevel'), cFbKeyGain = targetDoc.getElementById('cFbKeyGain');
   if(cFbKeyLevel) cFbKeyLevel.addEventListener('input', ()=>{ state.fbKeyLevel = cFbKeyLevel.value * 0.01; syncFbKey(); });
   if(cFbKeyGain) cFbKeyGain.addEventListener('input', ()=>{ state.fbKeyGain = cFbKeyGain.value * 0.01; syncFbKey(); });
+  const cVignette = targetDoc.getElementById('cVignette'), cVigFall = targetDoc.getElementById('cVigFall');
+  if(cVignette) cVignette.addEventListener('input', ()=>{ state.vignette = cVignette.value * 0.01; syncFx(); });
+  if(cVigFall) cVigFall.addEventListener('input', ()=>{ state.vigFall = cVigFall.value * 0.01; syncFx(); });
 
-  const bindDepth = (sliderId, readoutId, stateProp) => {
+  const bindDepth =(sliderId, readoutId, stateProp) => {
     const el = targetDoc.getElementById(sliderId);
     if(!el) return;
     el.addEventListener('input', ()=>{
@@ -20772,6 +20895,7 @@ function wireControls(targetDoc = document){
   bindDepth('cModComic', 'vModComic', 'modComic');
   bindDepth('cModSplit', 'vModSplit', 'modSplit');
   bindDepth('cModFeedback', 'vModFeedback', 'modFeedback');
+  bindDepth('cModVignette', 'vModVignette', 'modVignette');
   bindDepth('cModThresh', 'vModThresh', 'modThresh'); bindLfo('cLfoRateThresh', 'vLfoRateThresh', 'lfoRateThresh'); bindDepth('cAudModThresh', 'vAudModThresh', 'audModThresh');
   bindDepth('cModEdges', 'vModEdges', 'modEdges'); bindLfo('cLfoRateEdges', 'vLfoRateEdges', 'lfoRateEdges'); bindDepth('cAudModEdges', 'vAudModEdges', 'audModEdges');
   bindDepth('cModContour', 'vModContour', 'modContour'); bindLfo('cLfoRateContour', 'vLfoRateContour', 'lfoRateContour'); bindDepth('cAudModContour', 'vAudModContour', 'audModContour');
@@ -20797,6 +20921,7 @@ function wireControls(targetDoc = document){
   bindLfo('cLfoRateComic', 'vLfoRateComic', 'lfoRateComic');
   bindLfo('cLfoRateSplit', 'vLfoRateSplit', 'lfoRateSplit');
   bindLfo('cLfoRateFeedback', 'vLfoRateFeedback', 'lfoRateFeedback');
+  bindLfo('cLfoRateVignette', 'vLfoRateVignette', 'lfoRateVignette');
 
   bindLfo('cLfoRateTextScale', 'vLfoRateTextScale', 'lfoRateTextScale');
   bindLfo('cLfoRateTextScatter', 'vLfoRateTextScatter', 'lfoRateTextScatter');
@@ -20814,6 +20939,7 @@ function wireControls(targetDoc = document){
   bindDepth('cAudModComic', 'vAudModComic', 'audModComic');
   bindDepth('cAudModSplit', 'vAudModSplit', 'audModSplit');
   bindDepth('cAudModFeedback', 'vAudModFeedback', 'audModFeedback');
+  bindDepth('cAudModVignette', 'vAudModVignette', 'audModVignette');
 
   bindDepth('cAudModTextScale', 'vAudModTextScale', 'audModTextScale');
   bindDepth('cAudModTextScatter', 'vAudModTextScatter', 'audModTextScatter');
@@ -20941,6 +21067,7 @@ function openPopoutWindow(){
   setBgMode(state.bgMode);
   setFbKey(state.fbKey); syncFbKey();
   setInvert(state.invert);
+  setVigMask(state.vigMask); setVigShape(state.vigShape);
   ['A', 'B', 'C'].forEach(slot => setNoBg(slot, state['noBg' + slot]));
   syncSources();
   syncOutGrade();
